@@ -14,11 +14,10 @@ server_socket.listen(5)
 open_client_sockets = []
 messages_to_send = []
 
-reading = {} # socket:line
-writing = {} # socket:line
-appending = {} # socket:line
+reading = {} # socket:key value
+writing = {} # socket:key value
+appending = {} # socket:key value
 
-last_line = 0
 
 def send_waiting_messages(wlist):
     """A function for sending messages
@@ -69,10 +68,10 @@ while True:
                     # sending new tasks for clients
                     if data[:4] == "READ":
                         available(int(data[5:]), writing + appending)
-                    elif data[:5] == "WRITE":
+                    elif data[:5] == "REPLACE":
                         if available(int(data[6:]), reading+writing+appending):
-
-                    elif data[:6] == "INSERT":
+                            pass
+                    elif data[:6] == "APPEND":
                         new_task = last_line
                         last_line += 1
                     messages_to_send.append((current_socket, "OK:" + str(new_task)))
