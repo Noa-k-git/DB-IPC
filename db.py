@@ -55,11 +55,12 @@ class DataBase():
         Args:
             prop (int): the property index in shared memory
         """
-        self.__get_permission(prop)
+        self.__get_permission(prop) # if not locked and append one to the property
+        
         self.lock_buffer[prop + DataBase.LOCKED] += 1
         
+        # self.lock_buffer[prop] += 1
         queue_num = self.lock_buffer[prop]
-        self.lock_buffer[prop] += 1
         wait_thread = threading.Thread(target=self.wait_until, args=(queue_num, prop))
         wait_thread.start()
         succeed = wait_thread.join()
@@ -70,10 +71,23 @@ class DataBase():
 
 
     def __get_permission(self, prop):
-        if self.lock_buffer[prop + DataBase.LOCKED]:
-            return False
-        
+        """Gives premition if property isn't locked it adds one user to the property.
+
+        Args:
+            prop (int): the index of the property
+
+        Returns:
+            bool: if permition have been granted
+        """
         self.lock_buffer[prop] += 1
+        queue_num = self.lock_buffer[prop]
+
+        while self.lock_buffer[prop + DataBase.LOCKED]:
+            wait_thread = NewThread(target=self.wait_until, args=())
+            wait_thread = threading.Thread(target=self.wait_until, args=(queue_num, prop))
+            wait_thread.start()
+            succeed = wait_thread.join()
+        
         
         return True
 
