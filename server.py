@@ -8,7 +8,7 @@ class Server(ABC):
         self.PORT = port
 
         # Creating a server
-        self.server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM, 0)
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self.server_socket.bind((self.IP, self.PORT))
         print('server is up at : ',self.IP,self.PORT)
 
@@ -32,7 +32,7 @@ class Server(ABC):
                     print("Failed to send data {", data, '}')
             self.messages_to_send.remove(message)
     
-    def running(self):
+    def activate(self):
         while True:
             rlist, wlist, xlist = select.select( [self.server_socket] + self.open_client_sockets, self.open_client_sockets, [])
             
@@ -62,7 +62,7 @@ class Server(ABC):
                             
                     except ConnectionResetError: # handling a client randomly closed
                         print("Socket forcibly closed! ConnectionResetError")
-                        self.connection_error()
+                        self.connection_error(current_socket)
                         self.open_client_sockets.remove(current_socket)
             self.send_waiting_messages(wlist)
     
