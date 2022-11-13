@@ -19,6 +19,7 @@ class dbManagerServer(Server):
         self.current_writing = [False, None] # socket,key,value
         self.all_locked = [None, False]
         self.union_started = False
+        self.union_ok_message = False
         
     def handle_client(self, current_socket:socket.socket, data:str):
         request = data.split(':', 2)
@@ -56,7 +57,9 @@ class dbManagerServer(Server):
                             #self.messages_to_send.append((self.current_writing[1][0], 'OK'))
                 
                 elif cmd.lower() == 'admin_lock_0000':
+                    self.all_locked[0] = sock
                     self.all_locked[1] = True
+                    self.union_ok_message = False
                     del self.queue[0]
 
                     
@@ -72,13 +75,14 @@ class dbManagerServer(Server):
                 self.all_locked[1] = False
                 del self.queue[0]
 
-            
             else:
-                print(len(self.current_reading), self.current_writing)
-                if len(self.current_reading) == 0 and self.current_writing[1] == None:
-                    self.messages_to_send.append((self.all_locked[0], b'ok'))
-                else:
-                    time.sleep(0.05)
+                while not self.union_ok_message :
+                    if len(self.current_reading) == 0 and self.current_writing[1] == None:
+                        self.messages_to_send.append((self.all_locked[0], b'ok'))
+                        self.union_ok_message = True
+                        break
+                    else:
+                        time.sleep(0.05)
                     
             if os.path.getsize(self.db.changes_path) > 7000 and not self.union_started:
                 self.union_started = True
@@ -91,8 +95,8 @@ class dbManagerServer(Server):
         my_socket.connect((self.IP, self.PORT))
         my_socket.send(b'admin_lock_0000:')
         data = my_socket.recv(1024).decode()
-        print(data)
-        if data.lower == 'ok':
+        print("admin_socket.data:", data)
+        if data.lower() == 'ok':
             self.db.union()
         my_socket.send(b'admin_unlock_1111:')
         self.union_started = False

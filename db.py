@@ -31,7 +31,7 @@ class DataBase():
                     break
                 
                 key, value = line.split(":", 2)
-                db[key] = line[value]
+                new_dict[key] = value
                 
         return new_dict
     
@@ -55,7 +55,6 @@ class DataBase():
         for key, value in dict(updated).items():
             if value == 'None':
                 del updated[key]
-        self.__lock_prop(DataBase.READ)
         self.dict2file(updated)
         with open(self.changes_path, 'w'):
             pass
