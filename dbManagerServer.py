@@ -1,6 +1,7 @@
 from server import Server
 from db import DataBase
 import select
+import multiprocessing
 import threading
 import socket
 import time
@@ -17,19 +18,21 @@ class dbManagerServer(Server):
         self.current_reading = [] # tuple(socket:key)
         self.current_writing = [False, None] # socket,key,value
         self.all_locked = [None, False]
+        self.union_started = False
         
     def handle_client(self, current_socket:socket.socket, data:str):
         request = data.split(':', 2)
         if len(request) == 2:
             request = request[0], request[1].split(',', 2)
             self.queue.append((current_socket, request))
+
         if len(self.queue) == 1:
             self.manage_queue(current_socket)
     
     def manage_queue(self, current_socket:socket.socket):
         while not len(self.queue) == 0:
-            cmd = self.queue[0][1][0]
             sock = self.queue[0][0]
+            cmd = self.queue[0][1][0]
             args = self.queue[0][1][1]
             if not self.all_locked[1]:
                 if cmd.lower() == 'read':
@@ -54,33 +57,45 @@ class dbManagerServer(Server):
                 
                 elif cmd.lower() == 'admin_lock_0000':
                     self.all_locked[1] = True
+                    del self.queue[0]
+
                     
             elif cmd.lower() == 'release_r':
                 self.release_reader(current_socket)
+                del self.queue[0]
                         
             elif cmd.lower() == 'release_w':
                 self.release_writer()
+                del self.queue[0]
+
             elif cmd == 'admin_unlock_1111':
                 self.all_locked[1] = False
+                del self.queue[0]
+
             
             else:
-                if len(self.current_reading) == 0 and self.current_writing[1] == None and self.all_locked:
-                    self.messages_to_send(self.all_locked[0], 'ok')
+                print(len(self.current_reading), self.current_writing)
+                if len(self.current_reading) == 0 and self.current_writing[1] == None:
+                    self.messages_to_send.append((self.all_locked[0], b'ok'))
                 else:
                     time.sleep(0.05)
                     
-            if os.path.getsize(self.db.changes_path) > 7000:
-                client_thread = threading.Thread(target=self.union_client())
+            if os.path.getsize(self.db.changes_path) > 7000 and not self.union_started:
+                self.union_started = True
+                #client_process = multiprocessing.Process(target=self.union_client)
+                client_thread = threading.Thread(target=self.union_client)
                 client_thread.start()
         
     def union_client(self):
         my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         my_socket.connect((self.IP, self.PORT))
-        my_socket.send(b'admin_lock_0000')
+        my_socket.send(b'admin_lock_0000:')
         data = my_socket.recv(1024).decode()
-        if data == 'ok':
+        print(data)
+        if data.lower == 'ok':
             self.db.union()
-        my_socket.send(b'admin_unlock_1111')
+        my_socket.send(b'admin_unlock_1111:')
+        self.union_started = False
         
         
     def release_reader(self, current_socket):
