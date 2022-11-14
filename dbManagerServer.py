@@ -20,6 +20,8 @@ class dbManagerServer(Server):
         self.all_locked = [None, False]
         self.union_started = False
         self.union_ok_message = False
+        self.thread_lock = threading.Lock()
+        #self.db.union()
         
     def handle_client(self, current_socket:socket.socket, data:str):
         request = data.split(':', 2)
@@ -28,16 +30,18 @@ class dbManagerServer(Server):
             self.queue.append((current_socket, request))
 
         if len(self.queue) == 1:
-            self.manage_queue(current_socket)
-    
+            manage_queue_thread = threading.Thread(target=self.manage_queue, args=(current_socket,))
+            manage_queue_thread.start()
+
     def manage_queue(self, current_socket:socket.socket):
+        self.thread_lock.acquire()
         while not len(self.queue) == 0:
             sock = self.queue[0][0]
             cmd = self.queue[0][1][0]
             args = self.queue[0][1][1]
             if not self.all_locked[1]:
                 if cmd.lower() == 'read':
-                    if self.current_writing[1] == None or not cmd == self.current_writing[1][1][1]:
+                    if (self.current_writing[1] == None or not args[0] == self.current_writing[1][1][0]) and len(self.current_reading) <= 10:
                         self.current_reading.append((sock, args))
                         thread = threading.Thread(target=self.read, args=(sock, args[0]))
                         thread.start()
@@ -80,15 +84,16 @@ class dbManagerServer(Server):
                     if len(self.current_reading) == 0 and self.current_writing[1] == None:
                         self.messages_to_send.append((self.all_locked[0], b'ok'))
                         self.union_ok_message = True
-                        break
                     else:
                         time.sleep(0.05)
                     
             if os.path.getsize(self.db.changes_path) > 7000 and not self.union_started:
                 self.union_started = True
-                #client_process = multiprocessing.Process(target=self.union_client)
+                # client_process = multiprocessing.Process(target=self.union_client)
+                # client_process.start()
                 client_thread = threading.Thread(target=self.union_client)
                 client_thread.start()
+        self.thread_lock.release()
         
     def union_client(self):
         my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -115,7 +120,7 @@ class dbManagerServer(Server):
                         
     def connection_error(self, current_socket):
         for request in self.queue:
-            if request[0][0] == current_socket:
+            if request[0] == current_socket:
                 self.queue.remove(request)
         self.release_reader(current_socket)
         if self.current_writing[1] != None and self.current_writing[1][0] == current_socket:
@@ -141,5 +146,6 @@ class dbManagerServer(Server):
         finally:
             self.release_writer()
 
-server = dbManagerServer()
-server.activate()
+if __name__=='__main__':
+    server = dbManagerServer()
+    server.activate()

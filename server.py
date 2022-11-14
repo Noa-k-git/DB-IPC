@@ -44,7 +44,7 @@ class Server(ABC):
                 else:
                     try:
                         data = current_socket.recv(1024).decode()
-                        print ('New data from client! {', data, '}')
+                        print ('New data from client! {'+ data+ '}')
                         
                         # informing all client to end connection because the number is already found.
                         if data == 'end':
@@ -52,10 +52,9 @@ class Server(ABC):
                             for send_socket in wlist:
                                 self.messages_to_send.append((send_socket, b'end'))
                                 self.send_waiting_messages(wlist)
-                                send_socket.close()
                                 self.open_client_sockets.remove(send_socket)
+                                send_socket.close()
                             print (f"Connection with client {p_id} closed.")
-                            print('---'*6 + '\nNumber found:\n' + data[5:] + '\n' + '---'*6)
 
                         else:
                             self.handle_client(current_socket, data)

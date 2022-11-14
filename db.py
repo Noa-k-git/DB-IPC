@@ -1,4 +1,5 @@
 import os.path
+import time
 
 class DataBase():    
     def __init__(self, db_path="database.txt", changes_path="db_changes.txt"):
@@ -26,8 +27,8 @@ class DataBase():
         new_dict = {}
         with open(path, 'r') as db:
             while True:
-                line = db.readline()
-                if not line:
+                line = db.readline().strip()
+                if line == '':
                     break
                 
                 key, value = line.split(":", 2)
@@ -46,6 +47,7 @@ class DataBase():
                 db.write('%s:%s\n' % (key, value))
     
     def union(self):
+        time.sleep(1)
         """Merges the changes into the database
         """
         db = DataBase.read2dict(self.db_path)            
@@ -61,6 +63,7 @@ class DataBase():
 
         
     def read(self, key):
+        time.sleep(1)
         """Reads the content of the database and return content of the wanted value
 
         Args:
@@ -90,6 +93,7 @@ class DataBase():
         return None
             
     def append(self, key, value):
+        time.sleep(1)
         with open(self.changes_path, 'a') as f:
             f.write(key + ':' + value + '\n')            
             
