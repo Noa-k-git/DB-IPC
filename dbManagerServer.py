@@ -20,8 +20,9 @@ class dbManagerServer(Server):
         self.all_locked = [None, False]
         self.union_started = False
         self.union_ok_message = False
-        self.thread_lock = threading.Lock()
-        #self.db.union()
+        self.queue_lock = threading.Lock()
+        self.update_lock = threading.Lock()
+        self.db.union()
         
     def handle_client(self, current_socket:socket.socket, data:str):
         request = data.split(':', 2)
@@ -34,7 +35,7 @@ class dbManagerServer(Server):
             manage_queue_thread.start()
 
     def manage_queue(self, current_socket:socket.socket):
-        self.thread_lock.acquire()
+        self.queue_lock.acquire()
         while not len(self.queue) == 0:
             sock = self.queue[0][0]
             cmd = self.queue[0][1][0]
@@ -49,16 +50,15 @@ class dbManagerServer(Server):
                         del self.queue[0]
                 
                 elif cmd.lower() == 'update':
+                    self.update_lock.acquire()
                     if self.current_writing[1] == None:
-                        key_readers = [k for k in self.current_reading if k[1] == args]
                         self.current_writing = [False, (sock, args)]
                         del self.queue[0]
-                        if len(key_readers) == 0:
+                        if self._key_available(key=args[0]):
                             self.current_writing[0] = True
                             thread = threading.Thread(target=self.write)
                             thread.start()
-                            
-                            #self.messages_to_send.append((self.current_writing[1][0], 'OK'))
+                    self.update_lock.release()
                 
                 elif cmd.lower() == 'admin_lock_0000':
                     self.all_locked[0] = sock
@@ -93,7 +93,8 @@ class dbManagerServer(Server):
                 # client_process.start()
                 client_thread = threading.Thread(target=self.union_client)
                 client_thread.start()
-        self.thread_lock.release()
+
+        self.queue_lock.release()
         
     def union_client(self):
         my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -106,14 +107,25 @@ class dbManagerServer(Server):
         my_socket.send(b'admin_unlock_1111:')
         self.union_started = False
         
+    def _key_available(self, key):
+        """Receives a key and returns True if no one reads the key
+
+        Args:
+            key (str): key
+
+        Returns:
+            bool: True if someone reads key value, False otherwise
+        """
+        key_readers = [k for k in self.current_reading if k[1] == key]
+        return key_readers == []
         
     def release_reader(self, current_socket):
         for reader in self.current_reading:
             if reader[0] == current_socket:
-                if self.current_writing[1] != None and reader[1] == self.current_writing[1][1][0]:
-                    self.current_writing = True
-                    self.messages_to_send.append((self.current_writing[1][0], 'OK'))
                 self.current_reading.remove(reader)
+                if self.current_writing[1] != None and self._key_available(reader[1]) and reader[1] == self.current_writing[1][1][0]:
+                    self.current_writing[0] = True
+                    self.messages_to_send.append((self.current_writing[1][0], 'OK'))
 
     def release_writer(self):
         self.current_writing = [False, None]

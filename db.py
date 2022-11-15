@@ -1,3 +1,4 @@
+import threading
 import os.path
 import time
 
@@ -93,9 +94,9 @@ class DataBase():
         return None
             
     def append(self, key, value):
-        time.sleep(1)
+        time.sleep(20)
         with open(self.changes_path, 'a') as f:
-            f.write(key + ':' + value + '\n')            
+            f.write(key + ':' + value + '\n')
             
 if __name__ == "__main__":
     db = DataBase()

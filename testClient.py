@@ -12,28 +12,44 @@ def create_socket():
 
 def read(key:str):
     sock = create_socket()
+    print(time.time())
     sock.send(b'read:'+key.encode())
     data = sock.recv(1024)
+    print('read ended time:', time.time())
     print(data.decode())
     sock.send(b'end')
 
 def write(key:str, value:str):
     sock = create_socket()
     sock.send(b'update:'+key.encode()+b','+value.encode())
+    print(time.time())
+    sock.recv(1024)
+    print(f'updated {key}, {value}!', time.time())
     sock.send(b'end')
 
 # create some dummy data
-write('a', 'b')
-write('z', 'x')
-write('y', 'u')
-write('p', 'o')
-write('l', 'q')
+print('updating dummy data...')
+some_data = [threading.Thread(target=write, args=('a', 'b')),
+threading.Thread(target=write, args=('z', 'x')),
+threading.Thread(target=write, args=('y', 'u')),
+threading.Thread(target=write, args=('p', 'o')),
+threading.Thread(target=write, args=('l', 'q'))]
+
+for i in some_data:
+    i.start()
+for i in some_data:
+    i.join()
 
 # reading values while writing to them
 threading.Thread(target=write, args=('j', 'g')).start()
 threading.Thread(target=read, args=('j',)).start()
 threading.Thread(target=write, args=('j', 'k')).start()
 threading.Thread(target=read, args=('j',)).start()
+
+# reading with more than 10 clients
+# expected output 10 prints of the same time and 10 prints of one second later
+for i in range(20):
+    threading.Thread(target=read, args='j').start()
 
 # #connect to server
 # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

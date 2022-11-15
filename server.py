@@ -52,12 +52,14 @@ class Server(ABC):
                             for send_socket in wlist:
                                 self.messages_to_send.append((send_socket, b'end'))
                                 self.send_waiting_messages(wlist)
+                                self.connection_error(current_socket)
                                 self.open_client_sockets.remove(send_socket)
                                 send_socket.close()
                             print (f"Connection with client {p_id} closed.")
 
                         else:
                             self.handle_client(current_socket, data)
+                            data=''
                             
                     except ConnectionResetError: # handling a client randomly closed
                         print("Socket forcibly closed! ConnectionResetError")
