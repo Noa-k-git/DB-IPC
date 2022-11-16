@@ -47,7 +47,7 @@ class DataBase():
             for key, value in new_dict.items(): 
                 db.write('%s:%s\n' % (key, value))
     
-    def union(self):
+    def merge(self):
         time.sleep(1)
         """Merges the changes into the database
         """
@@ -91,10 +91,12 @@ class DataBase():
                 curr_key, curr_value = line.split(":", 2)
                 if curr_key == key:
                     return curr_value
-        return None
+        return 'None'
             
     def append(self, key, value):
         time.sleep(20)
+        if value == '':
+            value = None
         with open(self.changes_path, 'a') as f:
             f.write(key + ':' + value + '\n')
             

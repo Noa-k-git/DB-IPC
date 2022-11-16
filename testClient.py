@@ -22,12 +22,12 @@ def read(key:str):
 def write(key:str, value:str):
     sock = create_socket()
     sock.send(b'update:'+key.encode()+b','+value.encode())
-    print(time.time())
+    print(f'sent: {key}, {value} --- time: {time.time()}')
     sock.recv(1024)
-    print(f'updated {key}, {value}!', time.time())
+    print(f'updated: {key}, {value} --- time: {time.time()}')
     sock.send(b'end')
 
-# create some dummy data
+# create some dummy data in db
 print('updating dummy data...')
 some_data = [threading.Thread(target=write, args=('a', 'b')),
 threading.Thread(target=write, args=('z', 'x')),
@@ -39,6 +39,8 @@ for i in some_data:
     i.start()
 for i in some_data:
     i.join()
+
+exit()
 
 # reading values while writing to them
 threading.Thread(target=write, args=('j', 'g')).start()
