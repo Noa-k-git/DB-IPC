@@ -110,7 +110,7 @@ class dbManagerServer(Server):
                 self.__release_writer()
                 del self.queue[0]
 
-            elif cmd == 'admin_unlock_1111': # unlock to every db property
+            elif cmd.lower() == 'admin_unlock_1111': # unlock to every db property
                 self.all_locked[0] = False
                 del self.queue[0]
 
