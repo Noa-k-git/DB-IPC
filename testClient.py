@@ -55,6 +55,7 @@ def run_test(test):
         time.sleep(0.005)
     for i in test:
         i.join()
+
 # create some dummy data in db
 print('updating dummy data...')
 test = [Thread(target=write, args=('a', 'b')),
@@ -65,29 +66,32 @@ Thread(target=write, args=('l', 'q'))]
 run_test(test)
 
 # reading values while writing to them
+# expected time diff: 1, 2, 3, 4
 print('\nupdating j to g and then read it, updating j to k and then reading it.')
 test = [Thread(target=write, args=('j', 'g')),
 Thread(target=read, args=('j',)),
 Thread(target=write, args=('j', 'k')),
 Thread(target=read, args=('j',))]
 run_test(test)
+
 # reading with more than 10 clients
 # expected output 10 prints of the same time and 10 prints of one second later
 print('\nreading the same value (of j) with 20 clients (limit is 10)')
 test = [Thread(target=read, args='j') for _ in range(20)]
 run_test(test)
 
+# expected time diff: 1, 2, 2
 print('\ndelete element from db and reading none existing key')
 run_test([Thread(target=write, args=('j',)), 
           Thread(target=read, args=('j',)),
           Thread(target=read, args=('X',))])
 
-
+# expected time diff: 1, 1
 print('\nRead and write when its not the same value')
 run_test((Thread(target=write, args=('j','l')), 
           Thread(target=read, args=('l',))))
 
-
+# expected time diff: 1,..., 2, 3
 print('\nFinale test: reading from multiple clients, writing from one and trying to read the same value')
 test = [Thread(target=read, args=('z',)) for _ in range(8)] + \
     [Thread(target=write, args=('z',)), Thread(target=read, args=('z',))]
