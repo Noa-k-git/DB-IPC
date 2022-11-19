@@ -6,7 +6,7 @@ class DataBase():
     def __init__(self, db_path="database.txt", changes_path="db_changes.txt"):
         self.db_path = db_path
         self.changes_path = changes_path
-
+        self.lock = threading.Lock()
         if not os.path.exists(self.db_path):
             with open(self.db_path, 'w'):
                 pass
@@ -84,7 +84,6 @@ class DataBase():
         with open(self.db_path, 'r') as db:
             while True:
                 line = db.readline()
-                print(db.tell())
                 if not line:
                     break
                 
@@ -94,17 +93,14 @@ class DataBase():
         return 'None'
             
     def append(self, key, value):
-        time.sleep(20)
+        self.lock.acquire()
+        time.sleep(1)
+        print(f'active threads: {threading.active_count()}')
         if value == '':
-            value = None
+            value = str(None)
         with open(self.changes_path, 'a') as f:
             f.write(key + ':' + value + '\n')
+        self.lock.release()
             
 if __name__ == "__main__":
-    db = DataBase()
-    db.append('a', 'X')
-    db.append('b', 'Y')
-    db.replace('a', 'Z')
-    print(db.read('a'))
-    print(db.read('b'))
-    
+    pass

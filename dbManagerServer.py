@@ -1,4 +1,4 @@
-from server import Server
+from server import *
 from db import DataBase
 import select
 import multiprocessing
@@ -60,7 +60,7 @@ class dbManagerServer(Server):
             request = request[0], request[1].split(',', 2)
             self.queue.append((current_socket, request))
 
-        if len(self.queue) == 1:
+        if not self.queue_lock.locked():
             manage_queue_thread = threading.Thread(target=self.manage_queue)
             manage_queue_thread.start()
 
@@ -77,7 +77,8 @@ class dbManagerServer(Server):
 
             if not self.all_locked[0]: # if db props aren't locked
                 if cmd.lower() == 'read': # read from the db
-                    if (self.current_writing[1] == None or not args[0] == self.current_writing[1][1][0]) and len(self.current_reading) <= 10:
+                    if (self.current_writing[1] == None or not args[0] == self.current_writing[1][1][0]) and len(self.current_reading) < 10:
+                        logging.debug(f'current reading len {len(self.current_reading)}, +1')
                         self.current_reading.append((sock, args))
                         thread = threading.Thread(target=self.read, args=(sock, args[0]))
                         thread.start()
@@ -88,7 +89,7 @@ class dbManagerServer(Server):
                     if self.current_writing[1] == None:
                         self.current_writing = [False, (sock, args)]
                         del self.queue[0]
-                        if self._key_available(key=args[0]):
+                        if self.__key_available(key=args[0]):
                             self.current_writing[0] = True
                             thread = threading.Thread(target=self.write)
                             thread.start()
@@ -136,13 +137,13 @@ class dbManagerServer(Server):
         my_socket.connect((self.IP, self.PORT))
         my_socket.send(b'admin_lock_0000:')
         data = my_socket.recv(1024).decode()
-        print("admin_socket.data:", data)
+        logging.debug("admin_socket.data:", data)
         if data.lower() == 'ok':
             self.db.merge()
         my_socket.send(b'admin_unlock_1111:')
         self.merge_started = False
         
-    def _key_available(self, key):
+    def __key_available(self, key):
         """Receives a key and returns True if no one reads the key
 
         Args:
@@ -151,39 +152,51 @@ class dbManagerServer(Server):
         Returns:
             bool: True if someone reads key value, False otherwise
         """
-        key_readers = [k for k in self.current_reading if k[1] == key]
+        key_readers = []
+        for k in self.current_reading:
+            logging.critical(f'key: {key}, {k[1][0]}')
+            if k[1][0] == key:
+                key_readers.append(k)
+        logging.critical(key_readers)
         return key_readers == []
         
-    def __release_reader(self, current_socket):
+    def __release_reader(self, current_socket, key = None):
         """Releasing the reading request of the current socket
 
         Args:
             current_socket (socket.socket): client's socket
         """
-        for reader in self.current_reading:
-            if reader[0] == current_socket:
-                self.current_reading.remove(reader)
-                if self.current_writing[1] != None and self._key_available(reader[1]) and reader[1] == self.current_writing[1][1][0]:
-                    self.current_writing[0] = True
-                    self.messages_to_send.append((self.current_writing[1][0], 'OK'))
+        if key == 'j':
+            pass
+        all_readers = self.current_reading.copy()
+        if key == None:
+            self.current_reading = [reader for reader in all_readers if reader[0]!=current_socket]
+        else:
+            self.current_reading = [reader for reader in all_readers if reader[0]!=current_socket and key!=reader[1]]
+        
+        if self.current_writing[1] != None and self.__key_available(self.current_writing[1][1][0]) and not self.current_writing[0]:
+            self.current_writing[0] = True
+            #self.messages_to_send.append((self.current_writing[1][0], 'ok'))
+            thread = threading.Thread(target=self.write)
+            thread.start()
 
     def __release_writer(self):
         """Releasing the writer
         """
         self.current_writing = [False, None]
                         
-    def connection_error(self, current_socket:socket.socket):
-        """Remove the failed socket's task
+    def connection_closed(self, current_socket:socket.socket):
+        """Remove the socket's task
 
         Args:
             current_socket (socket.socket): failing socket
         """
         for request in self.queue:
-            if request[0] == current_socket:
+            if request[0] == current_socket and len(self.queue) > 1:
                 self.queue.remove(request)
         self.__release_reader(current_socket)
-        if self.current_writing[1] != None and self.current_writing[1][0] == current_socket:
-            self.current_writing = [False, None]
+        # if self.current_writing[1] != None and self.current_writing[1][0] == current_socket:
+        #     self.current_writing = [False, None]
         if self.all_locked[1] == current_socket:
             self.all_locked = [False, None]
             self.merge_ok_message = False
@@ -199,7 +212,7 @@ class dbManagerServer(Server):
             value = self.db.read(key)
             self.messages_to_send.append((sock, str(value).encode()))
         finally:
-            self.__release_reader(sock)
+            self.__release_reader(sock, key)
         
     def write(self):
         """Writing to the db and then releasing the writing property
@@ -210,7 +223,7 @@ class dbManagerServer(Server):
             value = self.current_writing[1][1][1]
             
             self.db.append(key, value)
-            self.messages_to_send.append((socket, b'OK'))
+            self.messages_to_send.append((socket, f'updated {key}, {value}'.encode()))
         finally:
             self.__release_writer()
 
